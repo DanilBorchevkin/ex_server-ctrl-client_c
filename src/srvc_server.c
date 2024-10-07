@@ -52,6 +52,7 @@
 #include <unistd.h>
 #include <ctype.h>
 #include <fcntl.h>
+#include <server.h>
 
 /******************************************************************************
  * DEFINES, CONSTS, ENUMS
@@ -124,28 +125,27 @@ void client_data_handler(int in_sock_fd, int out_sock_fd) {
 int main(int argc, char *argv[]) {
     printf("[SERVER] Started\n");
 
-    int server_sock_fd = -1;
-    struct sockaddr_in server;
+    server_handle_t server_handle;
+    server_conf_t server_conf = {
+        .addr = INADDR_ANY,
+        .max_clients = 1,
+        .port = 1067
+    };
 
-    server_sock_fd = socket(AF_INET, SOCK_STREAM, 0);
-    server.sin_family = AF_INET;
-    server.sin_addr.s_addr = htonl(INADDR_ANY);
-    server.sin_port = htons(PORT_SERVER);
-
-    bind(server_sock_fd, (struct sockaddr *) &server, sizeof(server));
-    listen(server_sock_fd, 5);
+    int32_t ret = server_init(&server_handle, &server_conf);
+    if (SERVER_ERR_OK != ret) {
+        printf("[SERVER] Cannot start server. Exit\n");
+        exit(EXIT_FAILURE);
+    }
 
     printf("[SERVER] Listening ... \n");
 
     while (true) {
-        int client_sock_fd = -1;
-        int client_len = 0;
-        struct sockaddr_in client;
+        server_client_t client;
+        ret = server_accept(&server_handle, &client);
 
-        client_len = sizeof(client);
-        client_sock_fd = accept(server_sock_fd, (struct sockaddr *) &client, &client_len);
         printf("[SERVER] Client connected\n");
-        client_data_handler(client_sock_fd, client_sock_fd);
+        client_data_handler(client.socket_fd, client.socket_fd);
         printf("[SERVER] Client disconnected\n");
     }
 

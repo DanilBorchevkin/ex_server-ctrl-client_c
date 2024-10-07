@@ -50,17 +50,18 @@ extern "C" {
  ******************************************************************************/
 
 #include <stddef.h>
-#include <unistd.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <unistd.h>
+#include <netinet/in.h>
 
 /******************************************************************************
  * DEFINES
  ******************************************************************************/
 
-#define SERVER_ERR_OK       ((ssize_t) 0);
-#define SERVER_ERR_NG       ((ssize_t) 1);
-#define SERVER_ERR_PARAMS   ((ssize_t) 2); 
+#define SERVER_ERR_OK       ((int32_t) 0)
+#define SERVER_ERR_NG       ((int32_t) 1)
+#define SERVER_ERR_PARAMS   ((int32_t) 2)
 
 /******************************************************************************
  * PUBLIC TYPES
@@ -68,18 +69,20 @@ extern "C" {
 
 typedef struct server_conf_s {
     uint16_t port;
-    uint32_t addr;
+    uint32_t addr;          // for local use INADDR_ANY
     size_t max_clients; 
 } server_conf_t;
 
 typedef struct server_handle_s {
     int socket_fd;
+    struct sockaddr_in sockaddr;
+    server_conf_t conf;
 } server_handle_t;
 
 typedef struct server_client_s {
     int socket_fd;
     struct sockaddr_in sockaddr;
-    size_t sockaddr_len;
+    int sockaddr_len;
 } server_client_t;
 
 /******************************************************************************
@@ -92,9 +95,9 @@ typedef struct server_client_s {
  * PUBLIC FUNCTION PROTOTYPES
  ******************************************************************************/
 
-ssize_t server_init(server_handle_t * p_handle, const server_conf_t * p_conf);
-ssize_t server_deinit(server_handle_t * p_handle);
-ssize_t server_accept(server_handle_t * p_handle, server_client_t * p_client);
+int32_t server_init(server_handle_t * p_handle, const server_conf_t * p_conf);
+int32_t server_deinit(server_handle_t * p_handle);
+int32_t server_accept(server_handle_t * p_handle, server_client_t * p_client);
 
 /******************************************************************************
  * END OF HEADER'S CODE

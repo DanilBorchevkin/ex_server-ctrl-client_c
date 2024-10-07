@@ -48,6 +48,7 @@ ROOT_DIR:=$(shell dirname $(realpath $(firstword $(MAKEFILE_LIST))))
 THREADS_NUM = $(shell nproc)
 BUILD_OPTS_RELEASE = -j${THREADS_NUM}
 BUILD_OPTS_DEBUG = -j1
+INC=-I${ROOT_DIR}/inc
 
 # *****************************************************************************
 # * TARGETS - MANDATORY
@@ -162,8 +163,8 @@ install:
 
 .PHONY: demo_build
 demo_build:
-	gcc -o ./artifacts/srvc_server src/srvc_server.c
-	gcc -o ./artifacts/srvc_client src/srvc_client.c
+	gcc $(INC) -o ${ROOT_DIR}/artifacts/srvc_server ${ROOT_DIR}/src/srvc_server.c ${ROOT_DIR}/src/server.c 
+	gcc $(INC) -o ${ROOT_DIR}/artifacts/srvc_client ${ROOT_DIR}/src/srvc_client.c
 
 # *****************************************************************************
 # * END OF MAKEFILE
