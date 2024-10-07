@@ -143,6 +143,9 @@ int main(int argc, char *argv[]) {
     while (true) {
         server_client_t client;
         ret = server_accept(&server_handle, &client);
+        if (SERVER_ERR_OK != ret) {
+            printf("[SERVER] Error during accept connection");
+        }
 
         printf("[SERVER] Client connected\n");
         client_data_handler(client.socket_fd, client.socket_fd);

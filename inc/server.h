@@ -62,6 +62,7 @@ extern "C" {
 #define SERVER_ERR_OK       ((int32_t) 0)
 #define SERVER_ERR_NG       ((int32_t) 1)
 #define SERVER_ERR_PARAMS   ((int32_t) 2)
+#define SERVER_ERR_SOCKET   ((int32_t) 3)
 
 /******************************************************************************
  * PUBLIC TYPES
