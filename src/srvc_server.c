@@ -128,7 +128,7 @@ int main(int argc, char *argv[]) {
     server_handle_t server_handle;
     server_conf_t server_conf = {
         .addr = INADDR_ANY,
-        .max_clients = 1,
+        .max_clients = 10[],
         .port = 1067
     };
 

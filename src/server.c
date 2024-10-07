@@ -163,6 +163,13 @@ int32_t server_accept(server_handle_t * p_handle, server_client_t * p_client) {
     return SERVER_ERR_OK;
 }
 
+int32_t server_concurrent(server_handle_t * p_handle) {
+    if (NULL == p_handle) {
+        return SERVER_ERR_PARAMS;
+    }
+
+}
+
 /******************************************************************************
  * END OF SOURCE'S CODE
  ******************************************************************************/
