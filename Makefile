@@ -160,6 +160,11 @@ run_debug: build_debug
 install:
 	cp ${ROOT_DIR}/artifacts/build/release/project /usr/local/sbin/project
 
+.PHONY: demo_build
+demo_build:
+	gcc -o ./artifacts/srvc_server src/srvc_server.c
+	gcc -o ./artifacts/srvc_client src/srvc_client.c
+
 # *****************************************************************************
 # * END OF MAKEFILE
 # *****************************************************************************
