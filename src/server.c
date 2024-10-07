@@ -49,12 +49,15 @@
 #include <string.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
+#include <poll.h>
+#include <stdio.h>
 
 /******************************************************************************
  * DEFINES, CONSTS, ENUMS
  ******************************************************************************/
 
-#define SOCKET_ERR      ((int) -1)  /**< Standard error value for sockets */
+#define SOCKET_ERR          ((int) -1)  /**< Standard error value for sockets */
+#define POLL_TIMEOUT_INF    ((int) -1)  /**< Infinite timeout for polling */    
 
 /******************************************************************************
  * PRIVATE TYPES
@@ -168,6 +171,70 @@ int32_t server_concurrent(server_handle_t * p_handle) {
         return SERVER_ERR_PARAMS;
     }
 
+    const int OPEN_MAX = sysconf(_SC_OPEN_MAX); 
+    struct pollfd clients[OPEN_MAX];
+
+    printf("[SERVER] Max connections is <%d>\n", OPEN_MAX);
+
+    for (size_t idx = 0; idx < OPEN_MAX; idx++) {
+        clients[idx].fd = SOCKET_ERR;
+    }
+
+    clients[0].fd = p_handle->socket_fd;
+    clients[0].events = POLLIN;
+
+    size_t peak_idx = 0;
+
+    while (true) {
+        int count_ready = poll(clients, peak_idx + 1, 0);
+
+        sleep(1);
+
+        for (size_t idx = 2; idx <= peak_idx; idx++) {
+            if (SOCKET_ERR == clients[idx].fd) {
+                continue;
+            }
+        }
+
+        // Check the new connection
+        server_client_t client;
+        if (clients[0].revents & POLLIN) {
+            printf("[SERVER] New connection\n");
+            int ret = server_accept(p_handle, &client);
+            if (SERVER_ERR_OK != ret) {
+                printf("[SERVER] Error during accept connection\n");
+                continue;
+            }
+            --count_ready;
+        }
+
+        // Save save clients
+        size_t idx = 0;
+        for (idx = 0; idx < OPEN_MAX; idx++) {
+            if (clients[idx].fd < 0) {
+                clients[idx].fd = client.socket_fd;
+                if (1 == idx) {
+                    printf("[SERVER] Registered controller client\n");
+                }
+                break;
+            }
+        }
+
+        if (OPEN_MAX == idx) {
+            fprintf(stderr, "[SERVER] Error: too many clients\n");
+            close(client.socket_fd);
+        } else {
+            clients[idx].events = POLLIN;
+
+            if (idx > peak_idx) {
+                peak_idx = idx;
+            }
+        }
+
+        if (count_ready <= 0) {
+            continue;
+        }
+    }
 }
 
 /******************************************************************************

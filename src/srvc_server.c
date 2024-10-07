@@ -128,8 +128,8 @@ int main(int argc, char *argv[]) {
     server_handle_t server_handle;
     server_conf_t server_conf = {
         .addr = INADDR_ANY,
-        .max_clients = 10[],
-        .port = 1067
+        .max_clients = 10,
+        .port = 10670
     };
 
     int32_t ret = server_init(&server_handle, &server_conf);
@@ -140,6 +140,7 @@ int main(int argc, char *argv[]) {
 
     printf("[SERVER] Listening ... \n");
 
+    /*
     while (true) {
         server_client_t client;
         ret = server_accept(&server_handle, &client);
@@ -151,8 +152,12 @@ int main(int argc, char *argv[]) {
         client_data_handler(client.socket_fd, client.socket_fd);
         printf("[SERVER] Client disconnected\n");
     }
+    */
 
-    return 0;
+    printf("[SERVER] Start concurrent server ... \n");
+    server_concurrent(&server_handle);
+
+    return EXIT_SUCCESS;
 }
 /******************************************************************************
  * END OF SOURCE'S CODE

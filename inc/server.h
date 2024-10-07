@@ -99,6 +99,7 @@ typedef struct server_client_s {
 int32_t server_init(server_handle_t * p_handle, const server_conf_t * p_conf);
 int32_t server_deinit(server_handle_t * p_handle);
 int32_t server_accept(server_handle_t * p_handle, server_client_t * p_client);
+int32_t server_concurrent(server_handle_t * p_handle);
 
 /******************************************************************************
  * END OF HEADER'S CODE
