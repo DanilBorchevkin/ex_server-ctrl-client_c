@@ -101,8 +101,10 @@ check_security:
 # Build project in debug configuration
 .PHONY: build_debug
 build_debug:
-	cmake -S ${ROOT_DIR} -B ${ROOT_DIR}/artifacts/build/debug
-	cmake --build ${ROOT_DIR}/artifacts/build/debug
+	gcc $(INC) -o ${ROOT_DIR}/artifacts/srvc_server ${ROOT_DIR}/src/srvc_server.c ${ROOT_DIR}/src/server.c 
+	gcc $(INC) -o ${ROOT_DIR}/artifacts/srvc_client ${ROOT_DIR}/src/srvc_client.c ${ROOT_DIR}/src/client.c 
+	gcc ${INC} -o ${ROOT_DIR}/artifacts/srvc_controller ${ROOT_DIR}/src/srvc_controller.c ${ROOT_DIR}/src/client.c 
+
 
 
 # Build project in release configuraiton
@@ -152,20 +154,19 @@ all_release:
 # * TARGETS - PROJECT-SPECIFIC
 # *****************************************************************************
 
-.PHONY: run_debug
-run_debug: build_debug
-	cd ${ROOT_DIR}/artifacts/build/debug && ./project
+.PHONY: run_server
+run_server: build_debug
+	${ROOT_DIR}/artifacts/srvc_server
 
 
-.PHONY: install
-install:
-	cp ${ROOT_DIR}/artifacts/build/release/project /usr/local/sbin/project
+.PHONY: run_controller
+run_controller: build_debug 
+	${ROOT_DIR}/artifacts/srvc_controller localhost 8888
 
-.PHONY: demo_build
-demo_build:
-	gcc $(INC) -o ${ROOT_DIR}/artifacts/srvc_server ${ROOT_DIR}/src/srvc_server.c ${ROOT_DIR}/src/server.c 
-	gcc $(INC) -o ${ROOT_DIR}/artifacts/srvc_client ${ROOT_DIR}/src/srvc_client.c ${ROOT_DIR}/src/client.c 
-	gcc ${INC} -o ${ROOT_DIR}/artifacts/srvc_controller ${ROOT_DIR}/src/srvc_controller.c ${ROOT_DIR}/src/client.c 
+
+.PHONY: run_client
+run_client: build_debug
+	${ROOT_DIR}/artifacts/srvc_client localhost 8888
 
 # *****************************************************************************
 # * END OF MAKEFILE
