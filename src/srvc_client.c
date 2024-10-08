@@ -97,6 +97,11 @@ static void sigint_handler(int ctx);
  * PRIVATE FUNCTIONS
  ******************************************************************************/
 
+/**
+ * @brief Sigint handler
+ * 
+ * @param sig received signal
+ */
 static void sigint_handler(int sig) {
     signal(sig, SIG_IGN);
     printf("\n\n[CLIENT] Ctrl+C was pressed. Exit\n\n");
@@ -127,9 +132,9 @@ int main(int argc, char *argv[]) {
 
     printf("[CLIENT] Connected to server. Press Ctr+C for exit\n");
 
-    char buffer[CONFIG_BUFFER_SIZE];
-
     while (true) {
+        char buffer[CONFIG_BUFFER_SIZE];
+
         ssize_t ret = 0;
         ret = read(g_socket_fd, buffer, CONFIG_BUFFER_SIZE);
 

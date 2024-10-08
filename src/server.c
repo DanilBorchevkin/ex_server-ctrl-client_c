@@ -46,18 +46,20 @@
 
 #include <netinet/in.h>
 #include <poll.h>
+#include <sys/socket.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
-#include <sys/socket.h>
+
+#include "common.h"
+#include "config.h"
 
 /******************************************************************************
  * DEFINES, CONSTS, ENUMS
  ******************************************************************************/
 
-#define SOCKET_ERR ((int)-1)       /**< Standard error value for sockets */
 #define POLL_TIMEOUT_INF ((int)-1) /**< Infinite timeout for polling */
 
 /******************************************************************************
@@ -92,6 +94,13 @@
  * PUBLIC FUNCTIONS
  ******************************************************************************/
 
+/**
+ * @brief Init server
+ *
+ * @param p_handle pointer to server handle
+ * @param p_conf pointer to server config
+ * @return int32_t 0 if OK, error otherwise
+ */
 int32_t server_init(server_handle_t *p_handle, const server_conf_t *p_conf) {
     if (NULL == p_handle) {
         return SERVER_ERR_PARAMS;
@@ -105,7 +114,7 @@ int32_t server_init(server_handle_t *p_handle, const server_conf_t *p_conf) {
     memcpy(&p_handle->conf, p_conf, sizeof(server_conf_t));
 
     p_handle->socket_fd = socket(AF_INET, SOCK_STREAM, 0);
-    if (SOCKET_ERR == p_handle->socket_fd) {
+    if (COMMON_SOCKET_ERR == p_handle->socket_fd) {
         return SERVER_ERR_SOCKET;
     }
 
@@ -115,12 +124,13 @@ int32_t server_init(server_handle_t *p_handle, const server_conf_t *p_conf) {
 
     int ret = bind(p_handle->socket_fd, (struct sockaddr *)&p_handle->sockaddr,
                    sizeof(p_handle->sockaddr));
-    if (SOCKET_ERR == ret) {
+    if (COMMON_SOCKET_ERR == ret) {
         return SERVER_ERR_SOCKET;
     }
 
-    ret = listen(p_handle->socket_fd, p_handle->conf.max_clients);
-    if (SOCKET_ERR == ret) {
+    p_handle->max_clients = server_max_clients();
+    ret = listen(p_handle->socket_fd, p_handle->max_clients);
+    if (COMMON_SOCKET_ERR == ret) {
         return SERVER_ERR_SOCKET;
     }
 
@@ -133,10 +143,18 @@ int32_t server_deinit(server_handle_t *p_handle) {
     }
 
     close(p_handle->socket_fd);
+    p_handle->socket_fd = COMMON_SOCKET_ERR;
 
     return SERVER_ERR_OK;
 }
 
+/**
+ * @brief Accept incoming connecion
+ *
+ * @param p_handle pointer to server handle
+ * @param p_client pointer to server client
+ * @return int32_t 0 if OK, error otherwise
+ */
 int32_t server_accept(server_handle_t *p_handle, server_client_t *p_client) {
     if (NULL == p_handle) {
         return SERVER_ERR_PARAMS;
@@ -156,107 +174,12 @@ int32_t server_accept(server_handle_t *p_handle, server_client_t *p_client) {
     return SERVER_ERR_OK;
 }
 
-int32_t server_concurrent(server_handle_t *p_handle) {
-    if (NULL == p_handle) {
-        return SERVER_ERR_PARAMS;
-    }
-
-    const int OPEN_MAX = sysconf(_SC_OPEN_MAX);
-    struct pollfd clients[OPEN_MAX];
-
-    printf("[SERVER] Max connections is <%d>\n", OPEN_MAX);
-
-    for (size_t idx = 0; idx < OPEN_MAX; idx++) {
-        clients[idx].fd = SOCKET_ERR;
-    }
-
-    clients[0].fd = p_handle->socket_fd;
-    clients[0].events = POLLIN | POLLERR | POLLOUT;
-
-    size_t peak_idx = 0;
-
-    while (true) {
-        int count_ready = poll(clients, peak_idx + 1, -1);
-        printf("[SERVER] Poll is activated due to events. Event count is <%d>\n", count_ready);
-
-
-        // NOTE: If no no new events, just rerun from start
-        if (count_ready <= 0) {
-            continue;
-        }
-
-        // Check the new connection
-        if (clients[0].revents & POLLIN) {
-            printf("[SERVER] New connection\n");
-
-            server_client_t client;
-            int ret = server_accept(p_handle, &client);
-            if (SERVER_ERR_OK != ret) {
-                printf("[SERVER] Error during accept connection\n");
-                continue;
-            }
-
-            size_t idx = 0;
-            for (idx = 1; idx < OPEN_MAX; idx++) {
-                if (clients[idx].fd < 0) {
-                    clients[idx].fd = client.socket_fd;
-                    if (1 == idx) {
-                        printf("[SERVER] Registered client as controller\n");
-                        clients[idx].events =  POLLIN | POLLERR | POLLOUT;
-                    } else {
-                        clients[idx].events = POLLIN | POLLERR | POLLOUT;
-                    }
-                    break;
-                }
-            }
-
-            if (OPEN_MAX == idx) {
-                fprintf(stderr, "[SERVER] Error: too many clients\n");
-                close(client.socket_fd);
-            } else {
-                if (idx > peak_idx) {
-                    peak_idx = idx;
-                }
-            }
-
-            --count_ready;
-        }
-
-        // NOTE: if there no events anymore - continue supercycle
-        if (count_ready <= 0) {
-            printf("[SERVER] No events for handling. Wait new events");
-            continue;
-        }
-
-        printf("[SERVER] Try to read from clients\n");
-
-        for (size_t idx = 0; idx <= peak_idx; idx++) {
-            if (SOCKET_ERR == clients[idx].fd) {
-                continue;
-            }
-
-            if (clients[idx].revents & (POLLIN | POLLERR | POLLOUT)) {
-                printf("[SERVER] Read from client\n");
-                char buf[1024];
-                ssize_t read_bytes = read(clients[idx].fd, buf, 1024);
-
-                if (read_bytes < 0) {
-                    printf("[SERVER] Error: cannot read from socket fd <%d>\n", clients[idx].fd);
-                    //close(clients[idx].fd);
-                    //clients[idx].fd = SOCKET_ERR;
-                } else if (0 == read_bytes) {
-                    printf("[SERVER] Connection closed for socket fd <%d>\n", clients[idx].fd);
-                    close(clients[idx].fd);
-                    clients[idx].fd = SOCKET_ERR;
-                } else if ((read_bytes > 0) && (1 == idx)) {
-                    printf("[SERVER] Receive data from the controller client. Push it to another clients");
-                } else {
-                    // NOTE: Receive data from other clients. Nothing to do.
-                }
-            }
-        }
-    }
-}
+/**
+ * @brief Return max possible clients for server
+ *
+ * @return size_t max count of clients
+ */
+size_t server_max_clients(void) { return ((size_t)sysconf(_SC_OPEN_MAX)); }
 
 /******************************************************************************
  * END OF SOURCE'S CODE
