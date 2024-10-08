@@ -1,7 +1,7 @@
 /**
   * @file      srvc_server.c
   *
-  * @brief     Service - Server
+  * @brief     Service - COntroller
   *
   * @date      2024-10-07
   *
@@ -47,20 +47,18 @@
 #include <stdbool.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <netinet/in.h>
+#include <netdb.h>
+#include <unistd.h>
 #include <ctype.h>
 #include <string.h>
 #include <signal.h>
-#include <unistd.h>
-#include <sys/types.h>
-#include <client.h>
-#include "config.h"
-#include "common.h"
 
 /******************************************************************************
  * DEFINES, CONSTS, ENUMS
  ******************************************************************************/
 
-
+#define PORT_SERVER     (1067)
 
 /******************************************************************************
  * PRIVATE TYPES
@@ -72,7 +70,7 @@
  * PRIVATE DATA
  ******************************************************************************/
 
-static int  g_socket_fd = COMMON_SOCKET_ERR;      /**< Global socket variable */
+
 
 /******************************************************************************
  * PUBLIC DATA
@@ -96,19 +94,23 @@ static int  g_socket_fd = COMMON_SOCKET_ERR;      /**< Global socket variable */
  * PRIVATE FUNCTION PROTOTYPES
  ******************************************************************************/
 
+static int  g_socket_fd = -1;
+static void free_ctx(void);
 static void sigint_handler(int ctx);
 
 /******************************************************************************
  * PRIVATE FUNCTIONS
  ******************************************************************************/
 
+static void free_ctx(void) {
+    close(g_socket_fd);
+}
+
 static void sigint_handler(int sig) {
     signal(sig, SIG_IGN);
-    printf("\n\n[CLIENT] Ctrl+C was pressed. Exit\n\n");
-
-    client_disconnect(&g_socket_fd);
-
-    exit(EXIT_SUCCESS);
+    printf("\n\nCtrl+C was pressed. Exit\n\n");
+    free_ctx();
+    exit(0);
 }
 
 /******************************************************************************
@@ -118,37 +120,63 @@ static void sigint_handler(int sig) {
 int main(int argc, char *argv[]) {
     signal(SIGINT, sigint_handler);
 
+    struct addrinfo hints;
+    struct addrinfo * result;
+    struct addrinfo * rp;
+
+    int s = 0;
+    int j = 0;
+    size_t len = 0;
+    ssize_t nread;
+
+    #define BUF_SIZE 1024
+    char buf[BUF_SIZE];
+
     if (argc < 3) {
-        fprintf(stderr, "\nUsage: %s, <host> <port>\n", argv[0]);
+        fprintf(stderr, "Usage: %s, host port  \n", argv[0]);
         exit(EXIT_FAILURE);
     }
 
-    int32_t ret = client_connect(argv[1], argv[2], &g_socket_fd);
-    if (CLIENT_ERR_OK != ret) {
-        printf("[CLIENT] Cannot connect to server. Error <%d> Exit\n", ret);    
+    /* Obtain addreses matching host / port */
+
+    memset(&hints, 0, sizeof(struct addrinfo));
+    hints.ai_family = AF_UNSPEC;
+    hints.ai_socktype = SOCK_STREAM;
+    hints.ai_flags = 0;
+    hints.ai_protocol = 0;
+
+    s = getaddrinfo(argv[1], argv[2], &hints, &result);
+
+    if(s != 0) {
+        fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(s));
+        exit(4);
+    }
+
+    for (rp = result; rp != NULL; rp = rp->ai_next) {
+        g_socket_fd = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
+        if (g_socket_fd == -1) {
+            continue;
+        }
+
+        if (connect(g_socket_fd, rp->ai_addr, rp->ai_addrlen) != -1) {
+            break; 
+        }
+
+        close(g_socket_fd); 
+    }
+    freeaddrinfo(result); 
+
+    if (NULL == rp) {
+        fprintf(stderr, "[CONTROLLER] Could not connect. Exit\n");
         exit(EXIT_FAILURE);
     }
 
-    printf("[CLIENT] Connected to server. Press Ctr+C for exit\n");
-
-    char buffer[CONFIG_BUFFER_SIZE];
+    printf("[CONTROLLER] Connected to server. Press Ctr+C for exit if need\n");
 
     while (true) {
-        ssize_t count = 0;
-        count = read(g_socket_fd, buffer, CONFIG_BUFFER_SIZE);
-
-        if (COMMON_SOCKET_ERR == count) {
-            printf("[CLIENT] Socket error. Exit\n");
-            break;
-        } else if (COMMON_SOCKET_CLOSED == count) {
-            printf("[CLIENT] Connection is closed. Exit\n");
-            break;
-        } else {
-            printf("[CLIENT] Received <%ld> bytes: <%s>\n", (size_t) count, buffer);
-        }
+        send(g_socket_fd, "ping", 4, 0);
+        sleep(5);
     }
-
-    client_disconnect(&g_socket_fd);
 
     exit(EXIT_SUCCESS);
 }

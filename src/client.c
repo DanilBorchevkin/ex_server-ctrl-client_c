@@ -1,9 +1,9 @@
 /**
-  * @file      srvc_server.c
+  * @file      client.c
   *
-  * @brief     Service - Server
+  * @brief     Client Module
   *
-  * @date      2024-10-07
+  * @date      2024-10-08
   *
   * @par
   * BSD 2-Clause License
@@ -34,7 +34,7 @@
   *
   */
 
-/** \addtogroup Doxygen group
+/** \addtogroup client
 *  @{
 */
 
@@ -42,18 +42,15 @@
  * INCLUDES
  ******************************************************************************/
 
+#include "client.h"
 #include <stdint.h>
 #include <stddef.h>
 #include <stdbool.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <ctype.h>
 #include <string.h>
-#include <signal.h>
+#include <netinet/in.h>
+#include <netdb.h>
 #include <unistd.h>
-#include <sys/types.h>
-#include <client.h>
-#include "config.h"
+#include <stdio.h>
 #include "common.h"
 
 /******************************************************************************
@@ -72,7 +69,7 @@
  * PRIVATE DATA
  ******************************************************************************/
 
-static int  g_socket_fd = COMMON_SOCKET_ERR;      /**< Global socket variable */
+
 
 /******************************************************************************
  * PUBLIC DATA
@@ -96,63 +93,81 @@ static int  g_socket_fd = COMMON_SOCKET_ERR;      /**< Global socket variable */
  * PRIVATE FUNCTION PROTOTYPES
  ******************************************************************************/
 
-static void sigint_handler(int ctx);
+
 
 /******************************************************************************
  * PRIVATE FUNCTIONS
  ******************************************************************************/
 
-static void sigint_handler(int sig) {
-    signal(sig, SIG_IGN);
-    printf("\n\n[CLIENT] Ctrl+C was pressed. Exit\n\n");
 
-    client_disconnect(&g_socket_fd);
-
-    exit(EXIT_SUCCESS);
-}
 
 /******************************************************************************
  * PUBLIC FUNCTIONS
  ******************************************************************************/
 
-int main(int argc, char *argv[]) {
-    signal(SIGINT, sigint_handler);
-
-    if (argc < 3) {
-        fprintf(stderr, "\nUsage: %s, <host> <port>\n", argv[0]);
-        exit(EXIT_FAILURE);
+int32_t client_connect(const char * p_host, const char* p_serv, int * p_socket_fd) {
+    if (NULL == p_host) {
+        return CLIENT_ERR_PARAM;
     }
 
-    int32_t ret = client_connect(argv[1], argv[2], &g_socket_fd);
-    if (CLIENT_ERR_OK != ret) {
-        printf("[CLIENT] Cannot connect to server. Error <%d> Exit\n", ret);    
-        exit(EXIT_FAILURE);
+    if (NULL == p_serv) {
+        return CLIENT_ERR_PARAM;
     }
 
-    printf("[CLIENT] Connected to server. Press Ctr+C for exit\n");
+    if (NULL == p_socket_fd) {
+        return CLIENT_ERR_PARAM;
+    }
 
-    char buffer[CONFIG_BUFFER_SIZE];
+    struct addrinfo hints;
+    struct addrinfo * p_result;
+    struct addrinfo * p_rp;
 
-    while (true) {
-        ssize_t count = 0;
-        count = read(g_socket_fd, buffer, CONFIG_BUFFER_SIZE);
+    memset(&hints, 0, sizeof(struct addrinfo));
 
-        if (COMMON_SOCKET_ERR == count) {
-            printf("[CLIENT] Socket error. Exit\n");
-            break;
-        } else if (COMMON_SOCKET_CLOSED == count) {
-            printf("[CLIENT] Connection is closed. Exit\n");
-            break;
-        } else {
-            printf("[CLIENT] Received <%ld> bytes: <%s>\n", (size_t) count, buffer);
+    hints.ai_family = AF_UNSPEC;
+    hints.ai_socktype = SOCK_STREAM;
+    hints.ai_flags = 0;
+    hints.ai_protocol = 0;
+
+    int ret = getaddrinfo(p_host, p_serv, &hints, &p_result);
+
+    if (0 != ret) {
+        // NOTE: can view error by gai_strerror(s) if need
+        return CLIENT_ERR_RESOLVE;
+    }
+
+    for (p_rp = p_result; p_rp != NULL; p_rp = p_rp->ai_next) {
+        *p_socket_fd = socket(p_rp->ai_family, p_rp->ai_socktype, p_rp->ai_protocol);
+        if (COMMON_SOCKET_ERR == *p_socket_fd) {
+            continue;
         }
+
+        if (COMMON_SOCKET_ERR != connect(*p_socket_fd, p_rp->ai_addr, p_rp->ai_addrlen)) {
+            break; 
+        }
+        
+        close(*p_socket_fd); 
     }
 
-    client_disconnect(&g_socket_fd);
+    freeaddrinfo(p_result); 
 
-    exit(EXIT_SUCCESS);
+    if (NULL == p_rp) {
+        return CLIENT_ERR_CONNECT;
+    }
+
+    return CLIENT_ERR_OK;
 }
 
+int32_t client_disconnect(int * p_socket_fd) {
+    if (NULL == p_socket_fd) {
+        return CLIENT_ERR_PARAM;
+    }
+
+    close(*p_socket_fd);
+    *p_socket_fd = COMMON_SOCKET_ERR;
+
+    return CLIENT_ERR_OK;
+}
 
 /******************************************************************************
  * END OF SOURCE'S CODE

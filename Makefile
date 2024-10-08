@@ -164,7 +164,8 @@ install:
 .PHONY: demo_build
 demo_build:
 	gcc $(INC) -o ${ROOT_DIR}/artifacts/srvc_server ${ROOT_DIR}/src/srvc_server.c ${ROOT_DIR}/src/server.c 
-	gcc $(INC) -o ${ROOT_DIR}/artifacts/srvc_client ${ROOT_DIR}/src/srvc_client.c
+	gcc $(INC) -o ${ROOT_DIR}/artifacts/srvc_client ${ROOT_DIR}/src/srvc_client.c ${ROOT_DIR}/src/client.c 
+	gcc ${INC} -o ${ROOT_DIR}/artifacts/srvc_controller ${ROOT_DIR}/src/srvc_controller.c ${ROOT_DIR}/src/client.c 
 
 # *****************************************************************************
 # * END OF MAKEFILE
